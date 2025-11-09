@@ -1,0 +1,58 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum JobState {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+  DEAD
+}
+
+model Job {
+  id            String    @id @default(uuid())
+  command       String
+  state         JobState  @default(PENDING)
+  attempts      Int       @default(0)
+  maxRetries    Int       @default(3)
+  priority      Int       @default(0)
+  timeout       Int?
+  runAt         DateTime?
+  lockedBy      String?
+  lockedAt      DateTime?
+  output        String?
+  error         String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  completedAt   DateTime?
+  nextRetryAt   DateTime?
+  startedAt     DateTime?
+  duration      Int?
+  @@index([state])
+  @@index([lockedBy])
+  @@index([nextRetryAt])
+  @@index([priority, createdAt])
+  @@index([state, nextRetryAt])
+  @@index([runAt])
+}
+
+model Metric {
+  id        String   @id @default(uuid())
+  type      String
+  value     Float
+  timestamp DateTime @default(now())
+  @@index([type, timestamp])
+}
+
+model Config {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt
+}
+

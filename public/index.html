@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>QueueCTL Dashboard</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f5f5; padding: 20px; }
+    .container { max-width: 1400px; margin: 0 auto; }
+    h1 { color: #333; margin-bottom: 30px; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; margin-bottom: 20px; }
+    .card { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+    .card h2 { font-size: 18px; margin-bottom: 15px; color: #555; }
+    .stat { font-size: 32px; font-weight: bold; color: #2563eb; }
+    .chart-container { position: relative; height: 300px; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { padding: 10px; text-align: left; border-bottom: 1px solid #eee; }
+    th { background: #f9fafb; font-weight: 600; color: #555; }
+    .state-pending { color: #f59e0b; }
+    .state-processing { color: #3b82f6; }
+    .state-completed { color: #10b981; }
+    .state-failed { color: #ef4444; }
+    .state-dead { color: #6b7280; }
+    button { background: #2563eb; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; }
+    button:hover { background: #1d4ed8; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>QueueCTL Dashboard</h1>
+    
+    <div class="grid">
+      <div class="card">
+        <h2>Total Jobs</h2>
+        <div class="stat" id="totalJobs">0</div>
+      </div>
+      <div class="card">
+        <h2>Avg Duration</h2>
+        <div class="stat" id="avgDuration">0s</div>
+      </div>
+      <div class="card">
+        <h2>Pending</h2>
+        <div class="stat state-pending" id="pending">0</div>
+      </div>
+      <div class="card">
+        <h2>Processing</h2>
+        <div class="stat state-processing" id="processing">0</div>
+      </div>
+      <div class="card">
+        <h2>Completed</h2>
+        <div class="stat state-completed" id="completed">0</div>
+      </div>
+      <div class="card">
+        <h2>Failed</h2>
+        <div class="stat state-failed" id="failed">0</div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-bottom: 20px;">
+      <h2>Job States Distribution</h2>
+      <div class="chart-container">
+        <canvas id="stateChart"></canvas>
+      </div>
+    </div>
+
+    <div class="card" style="margin-bottom: 20px;">
+      <h2>Job Duration Over Time</h2>
+      <div class="chart-container">
+        <canvas id="durationChart"></canvas>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Recent Jobs</h2>
+      <button onclick="refreshJobs()" style="margin-bottom: 10px;">Refresh</button>
+      <table>
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Command</th>
+            <th>State</th>
+            <th>Duration</th>
+            <th>Created</th>
+          </tr>
+        </thead>
+        <tbody id="jobsTable"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <script>
+    let stateChart, durationChart;
+
+    async function loadStats() {
+      const res = await fetch('/api/stats');
+      const stats = await res.json();
+      
+      document.getElementById('totalJobs').textContent = stats.total;
+      document.getElementById('pending').textContent = stats.byState.PENDING || 0;
+      document.getElementById('processing').textContent = stats.byState.PROCESSING || 0;
+      document.getElementById('completed').textContent = stats.byState.COMPLETED || 0;
+      document.getElementById('failed').textContent = (stats.byState.FAILED || 0) + (stats.byState.DEAD || 0);
+      document.getElementById('avgDuration').textContent = stats.avgDuration > 0 
+        ? (stats.avgDuration / 1000).toFixed(2) + 's' 
+        : '0s';
+
+      updateStateChart(stats.byState);
+    }
+
+    function updateStateChart(byState) {
+      const ctx = document.getElementById('stateChart').getContext('2d');
+      if (stateChart) stateChart.destroy();
+      
+      stateChart = new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+          labels: ['Pending', 'Processing', 'Completed', 'Failed', 'Dead'],
+          datasets: [{
+            data: [
+              byState.PENDING || 0,
+              byState.PROCESSING || 0,
+              byState.COMPLETED || 0,
+              byState.FAILED || 0,
+              byState.DEAD || 0
+            ],
+            backgroundColor: ['#f59e0b', '#3b82f6', '#10b981', '#ef4444', '#6b7280']
+          }]
+        },
+        options: { responsive: true, maintainAspectRatio: false }
+      });
+    }
+
+    async function loadDurationChart() {
+      const res = await fetch('/api/metrics?type=job_duration&hours=24');
+      const metrics = await res.json();
+      
+      const ctx = document.getElementById('durationChart').getContext('2d');
+      if (durationChart) durationChart.destroy();
+      
+      durationChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: metrics.map(m => new Date(m.timestamp).toLocaleTimeString()),
+          datasets: [{
+            label: 'Duration (ms)',
+            data: metrics.map(m => m.value),
+            borderColor: '#2563eb',
+            backgroundColor: 'rgba(37, 99, 235, 0.1)',
+            tension: 0.4
+          }]
+        },
+        options: { 
+          responsive: true, 
+          maintainAspectRatio: false,
+          scales: { y: { beginAtZero: true } }
+        }
+      });
+    }
+
+    async function refreshJobs() {
+      const res = await fetch('/api/jobs');
+      const jobs = await res.json();
+      const tbody = document.getElementById('jobsTable');
+      tbody.innerHTML = jobs.slice(0, 20).map(job => `
+        <tr>
+          <td>${job.id.slice(0, 8)}</td>
+          <td>${job.command.slice(0, 40)}</td>
+          <td class="state-${job.state.toLowerCase()}">${job.state}</td>
+          <td>${job.duration ? (job.duration / 1000).toFixed(2) + 's' : '-'}</td>
+          <td>${new Date(job.createdAt).toLocaleString()}</td>
+        </tr>
+      `).join('');
+    }
+
+    async function init() {
+      await loadStats();
+      await loadDurationChart();
+      await refreshJobs();
+      setInterval(loadStats, 5000);
+      setInterval(loadDurationChart, 10000);
+      setInterval(refreshJobs, 5000);
+    }
+
+    init();
+  </script>
+</body>
+</html>
+

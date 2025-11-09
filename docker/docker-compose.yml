@@ -1,0 +1,61 @@
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: queuectl-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: queuectl
+      POSTGRES_PASSWORD: queuectl_password
+      POSTGRES_DB: queuectl
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U queuectl"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - queuectl-network
+
+  app:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    container_name: queuectl-app
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: "postgresql://queuectl:queuectl_password@postgres:5432/queuectl"
+      NODE_ENV: "development"
+      LOG_LEVEL: "info"
+    ports:
+      - "3000:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - app_data:/app/data
+      - ../src:/app/src
+      - ../public:/app/public
+      - ../verify.sh:/app/verify.sh
+      - ../package.json:/app/package.json
+      - ../tsconfig.json:/app/tsconfig.json
+      - ../nodemon.json:/app/nodemon.json
+      - ../prisma:/app/prisma
+    networks:
+      - queuectl-network
+    command: ["/app/scripts/docker-entrypoint.sh"]
+    working_dir: /app
+
+volumes:
+  postgres_data:
+    driver: local
+  app_data:
+    driver: local
+
+networks:
+  queuectl-network:
+    driver: bridge
+
