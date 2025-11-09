@@ -2,6 +2,9 @@
 
 A simple CLI job queue system with PostgreSQL, retry logic, and Dead Letter Queue.
 
+**Additional Resources:**
+- [Design Documentation](https://drive.google.com/file/d/1GPsE1FZfDXjC-vXaYFFP_ydKAvKX08fy/view?usp=sharing)
+
 ## Setup Instructions
 
 **Prerequisites:** Docker, Docker Compose
