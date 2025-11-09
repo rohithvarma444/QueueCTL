@@ -3,7 +3,7 @@
 A simple CLI job queue system with PostgreSQL, retry logic, and Dead Letter Queue.
 
 **Additional Resources:**
-- [Design Documentation](https://drive.google.com/file/d/1GPsE1FZfDXjC-vXaYFFP_ydKAvKX08fy/view?usp=sharing)
+- [Design Documentation](https://drive.google.com/file/d/1S7ielTmKQwyF937qMg-9GwQMUz4wvki3/view?usp=sharing)
 
 ## Setup Instructions
 
@@ -112,6 +112,18 @@ $ queuectl dlq retry d4e5f6a7
 Job d4e5f6a7 back in queue
 ```
 
+**Config operations:**
+```bash
+$ queuectl config set backoff_base 2
+backoff_base = 2
+
+$ queuectl config get backoff_base
+backoff_base = 2
+
+$ queuectl config get nonexistent_key
+nonexistent_key = not set
+```
+
 ## Architecture Overview
 
 **Job Lifecycle:**
@@ -217,6 +229,12 @@ queuectl enqueue '{"command":"sleep 10","timeout":2000}'
 queuectl worker start --count 1
 sleep 3
 queuectl list --state FAILED
+```
+
+**Test config:**
+```bash
+queuectl config set backoff_base 2
+queuectl config get backoff_base
 ```
 
 **Test dashboard:**

@@ -10,8 +10,6 @@ services:
       POSTGRES_DB: queuectl
     ports:
       - "5432:5432"
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U queuectl"]
       interval: 10s
@@ -50,8 +48,6 @@ services:
     working_dir: /app
 
 volumes:
-  postgres_data:
-    driver: local
   app_data:
     driver: local
 

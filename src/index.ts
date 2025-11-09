@@ -181,11 +181,11 @@ dlqCmd
 
 dlqCmd
   .command('retry <jobId>')
-  .description('Retry a dead job')
+  .description('Retry a dead job (supports partial IDs)')
   .action(async (jobId: string) => {
     try {
-      await db.retryFromDLQ(jobId);
-      console.log(chalk.green(`Job ${jobId} back in queue`));
+      const job = await db.retryFromDLQ(jobId);
+      console.log(chalk.green(`Job ${job.id} back in queue`));
     } catch (error: any) {
       console.error(chalk.red(`Error: ${error.message}`));
       process.exit(1);
@@ -220,12 +220,12 @@ program
 
 program
   .command('show <jobId>')
-  .description('Show job details and output')
+  .description('Show job details and output (supports partial IDs)')
   .action(async (jobId: string) => {
     try {
-      const job = await db.getJobById(jobId);
+      const job = await db.findJobByIdOrPartial(jobId);
       if (!job) {
-        console.error(chalk.red(`Job ${jobId} not found`));
+        console.error(chalk.red(`Job "${jobId}" not found`));
         process.exit(1);
       }
       

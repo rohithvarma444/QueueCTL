@@ -161,6 +161,37 @@ export const db = {
     });
   },
 
+  async findJobByIdOrPartial(partialId: string) {
+    // First try exact match
+    const exactMatch = await prisma.job.findUnique({
+      where: { id: partialId },
+    });
+    if (exactMatch) {
+      return exactMatch;
+    }
+
+    // If no exact match, try partial match (jobs starting with the given ID)
+    // Using Prisma's string filter for pattern matching
+    const jobs = await prisma.job.findMany({
+      where: {
+        id: {
+          startsWith: partialId,
+        },
+      },
+      take: 2, // Only fetch 2 to check for multiple matches
+    });
+
+    if (jobs.length === 0) {
+      return null;
+    }
+
+    if (jobs.length > 1) {
+      throw new Error(`Multiple jobs found matching "${partialId}". Please use a longer ID to be more specific.`);
+    }
+
+    return jobs[0];
+  },
+
   async getDLQJobs() {
     return prisma.job.findMany({
       where: { state: JobState.DEAD },
@@ -169,8 +200,20 @@ export const db = {
   },
 
   async retryFromDLQ(jobId: string) {
+    // Find job by full or partial ID
+    const job = await this.findJobByIdOrPartial(jobId);
+    
+    if (!job) {
+      throw new Error(`Job "${jobId}" not found.`);
+    }
+
+    // Validate job is in DEAD state
+    if (job.state !== JobState.DEAD) {
+      throw new Error(`Job ${job.id} is not in DEAD state (current state: ${job.state}). Only dead jobs can be retried from DLQ.`);
+    }
+
     return prisma.job.update({
-      where: { id: jobId },
+      where: { id: job.id },
       data: {
         state: JobState.PENDING,
         attempts: 0,
